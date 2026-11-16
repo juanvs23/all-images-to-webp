@@ -13,23 +13,96 @@ converted 2  skipped 0  failed 0  planned 0  (2 discovered)
 finished in 1.42s
 ```
 
-## Requirements
+---
 
-- Node.js >= 20.
-- `sharp` ships prebuilt libvips binaries; no system image libraries are needed on
-  common platforms.
+## 1. Requirements
 
-## Install
+| Requirement | Detail |
+| --- | --- |
+| Node.js | `>= 20`. Declared in `package.json` under `engines`. |
+| Operating system | Linux, macOS, or Windows. No system image libraries are needed on the platforms `sharp` ships prebuilt binaries for (Linux x64/arm64, macOS x64/arm64, Windows x64). |
+| Disk space | A default run keeps the originals, so plan for roughly the source tree size plus the converted output. |
+| Permissions | Read access to the scanned tree. Write access to each target directory (the source directory, or `--out`). Delete permission only if you pass `--remove-original`. |
+
+### About `sharp`
+
+`sharp` bundles libvips as a prebuilt binary; it is installed automatically as the
+single runtime dependency. On an unsupported platform or libc (for example Alpine
+musl, or an unusual architecture) npm falls back to building libvips from source,
+which requires a C/C++ toolchain and `vips` development headers on the machine. If
+installation fails, that is the cause, not the CLI.
+
+---
+
+## 2. Configuration
+
+`webpify` is **configured entirely through command-line flags and their defaults.
+There is no config file, and none is planned** — a tool that reads a hidden
+`.webpifyrc` is a tool whose behaviour you cannot verify from the command you ran.
+
+### Installation
 
 ```bash
+# From a local checkout — the route that works today
+npm install
+npm run build
+npm link
+
+# From the npm registry — available once the package is published
 npm install --global all-images-to-webp
-# or, without installing:
 npx all-images-to-webp ./photos
 ```
 
-The installed binary is called `webpify`.
+All forms expose the same binary name: **`webpify`**. The package is not published to
+the npm registry yet, so until it is, use the checkout route above.
 
-## Usage
+> **Rebuild after changing the source.** `npm link` (and any local install) points at
+> the compiled `dist/cli.js`, never at `src/`. After editing TypeScript you must run
+> `npm run build`, otherwise the global `webpify` command keeps running the previous
+> build. Nothing rebuilds automatically.
+
+### Defaults
+
+Every flag has a default, so `webpify <location>` alone is a valid, complete run.
+
+| Setting | Flag | Default |
+| --- | --- | --- |
+| Target format | — | WebP, always |
+| Quality | `-q, --quality <1-100>` | `80` (lossy) |
+| Encoder effort | `--effort <0-6>` | `4` |
+| Lossless mode | `--lossless` | off |
+| Maximum width | `--max-width <px>` | unlimited, never enlarges |
+| Maximum height | `--max-height <px>` | unlimited, never enlarges |
+| Recursion | `--no-recursive` to disable | recursive |
+| Existing `.webp` target | `--overwrite` to replace | skipped |
+| Metadata (EXIF/ICC) | `--keep-metadata` to retain | stripped, after orientation |
+| Original files | `--remove-original` to delete | kept |
+| Output location | `-o, --out <dir>` | next to each source |
+| Parallel conversions | `-c, --concurrency <n>` | `os.availableParallelism()` |
+| Progress output | `-Q, --quiet` to silence | one line per file |
+| Machine output | `--json` | human report |
+
+### Environment variables
+
+| Variable | Effect |
+| --- | --- |
+| `NO_COLOR` | Disables ANSI colors. Any non-empty value disables them. Colors are already off whenever the stream is not a TTY, so this only matters in an interactive terminal. |
+
+Nothing else is read from the environment. There is no telemetry, no network access,
+and no remote service.
+
+### Which files are in scope
+
+The allow-list is fixed and case-insensitive:
+`.jpg .jpeg .png .gif .tif .tiff .avif .heif .svg`.
+
+`.webp` inputs are discovered and reported, but never re-encoded (reason
+`already-webp`) — re-encoding a WebP onto itself gains nothing and would collide with
+its own path. Symlinks are never followed, for files or directories.
+
+---
+
+## 3. Usage
 
 ```
 webpify <location> [options]
@@ -52,15 +125,21 @@ webpify <location> [options]
   -v, --version            Show the version
 ```
 
-## Examples
+The current directory can be used as the location:
 
-Write optimized copies next to the originals:
+```bash
+cd ~/photos && webpify .
+```
+
+### Common recipes
+
+Convert in place, next to the originals:
 
 ```bash
 webpify ./photos
 ```
 
-Mirror a tree into a separate output directory:
+Write a mirrored copy and leave the originals untouched:
 
 ```bash
 webpify ./photos --out ./photos-webp --quality 82 --effort 5
@@ -72,45 +151,38 @@ Cap large images without ever enlarging small ones:
 webpify ./photos --max-width 1920 --max-height 1080
 ```
 
-Preview a run without touching the disk:
+Preview a run without touching the disk, then feed the totals to `jq`:
 
 ```bash
-webpify ./photos --dry-run --json
+webpify ./photos --dry-run --json | jq .totals
 ```
 
-Replace originals after a verified conversion (there is no undo):
+Replace originals after a verified conversion (**irreversible**):
 
 ```bash
+webpify ./photos --dry-run     # look first
 webpify ./photos --remove-original
 ```
 
-## What gets converted
+### Output paths
 
-The extension allow-list is fixed and case-insensitive:
-`.jpg .jpeg .png .gif .tif .tiff .avif .heif .svg`.
-
-- `.webp` inputs are never re-encoded; they are reported as
-  `skipped` with reason `already-webp`.
-- Symlinks are not followed, for files or directories.
-- Output order is deterministic (sorted by relative path).
-- Animated GIFs keep their animation.
-
-## Output behavior
-
-- Default target: the same directory as the source, same basename, `.webp`
-  extension.
-- With `--out`: the path relative to the scanned root is mirrored under the output
-  directory, so `photos/team/ana.png` becomes `<out>/team/ana.webp`.
+- Default target: the same directory as the source, same basename, `.webp` extension.
+- With `--out`: the path relative to the scanned root is mirrored, so
+  `photos/team/ana.png` becomes `<out>/team/ana.webp`.
 - An existing target is left alone unless `--overwrite` is passed.
-- Encoding always applies EXIF orientation via `sharp(...).rotate()`.
-- EXIF and ICC metadata are stripped by default; pass `--keep-metadata` to retain
-  them after orientation is applied.
-- `--remove-original` deletes the source only after the target exists with a
-  non-zero size.
-- Writes are atomic: the encoder writes `<target>.part`, which is renamed into
-  place. A failed or interrupted conversion never leaves a truncated `.webp`.
 
-## Per-file statuses
+### Safety behaviour
+
+- Encoding always applies EXIF orientation via `sharp(...).rotate()`. Photos taken in
+  portrait keep their visible orientation even though EXIF is stripped.
+- Writes are atomic: the encoder writes `<target>.part`, which is then renamed into
+  place. A failed or interrupted conversion never leaves a truncated `.webp`.
+- `--remove-original` deletes a source only after its target exists with a non-zero
+  size. There is no undo.
+- One corrupt file never aborts the batch. It is reported as `failed`, everything else
+  still converts, and the process exits `1`.
+
+### Per-file statuses
 
 | Status | Meaning |
 | --- | --- |
@@ -119,10 +191,20 @@ The extension allow-list is fixed and case-insensitive:
 | `failed` | Encoding failed; `error` explains why. |
 | `planned` | `--dry-run` outcome: the file would have been converted. |
 
-## JSON output
+### Exit codes
 
-`--json` prints a single JSON document to stdout (progress and summary go to
-stderr):
+| Code | Meaning |
+| --- | --- |
+| `0` | Every discovered file was converted, skipped, or planned. |
+| `1` | At least one file failed. Other files still converted. |
+| `2` | Usage or validation error (missing or extra `<location>`, unknown flag, non-directory path, out-of-range value). The message and usage go to stderr. |
+
+`--help` and `--version` print to stdout and exit `0`.
+
+### JSON output
+
+`--json` prints a single JSON document to stdout; progress and the summary move to
+stderr, so stdout can be piped directly into another tool.
 
 ```json
 {
@@ -156,18 +238,12 @@ stderr):
 ```
 
 `totals.inputBytes`, `outputBytes`, `savedBytes`, and `savedPercent` cover converted
-files only, so skipped and failed files cannot distort the saving. A negative
-`savedPercent` means the WebP outputs came out larger than their sources.
+files only, so skipped and failed files cannot distort the saving.
 
-## Exit codes
+> A negative `savedPercent` is possible and reported as-is: a small, low-colour PNG can
+> produce a *larger* WebP. The tool tells you the truth rather than hiding it.
 
-| Code | Meaning |
-| --- | --- |
-| `0` | Every discovered file was converted, skipped, or planned. |
-| `1` | At least one file failed. Other files still converted. |
-| `2` | Usage or validation error (missing/extra `<location>`, unknown flag, non-directory path, out-of-range value). The message goes to stderr. |
-
-`--help` and `--version` print to stdout and exit `0`.
+---
 
 ## Programmatic API
 
@@ -191,8 +267,10 @@ const summary: RunSummary = await convertAll({
 process.exitCode = summary.totals.failed > 0 ? 1 : 0;
 ```
 
-`convertAll` never prints; `scanner.ts` and `converter.ts` are importable and
-testable without spawning a process.
+`convertAll` never prints. `scanner.ts` and `converter.ts` are importable and testable
+without spawning a process.
+
+---
 
 ## Development
 
@@ -202,6 +280,9 @@ npm run typecheck   # tsc --noEmit
 npm test            # build + vitest (unit and CLI e2e)
 npm run build       # tsc -> dist/
 ```
+
+Architecture, vocabulary, and environment notes live in `docs/context.md`. The
+authoritative feature contract is `odd/tasks/all-images-to-webp.md`.
 
 ## License
 
