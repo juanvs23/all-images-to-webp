@@ -61,6 +61,34 @@ the npm registry yet, so until it is, use the checkout route above.
 > `npm run build`, otherwise the global `webpify` command keeps running the previous
 > build. Nothing rebuilds automatically.
 
+### Verify the install
+
+The documentation never records where the binary landed on a particular machine — that
+path is machine-specific and would be wrong on the next clone. Ask the system instead:
+
+```bash
+which webpify                    # the binary your shell will run
+readlink -f "$(which webpify)"   # the code that binary actually executes
+webpify --version                # confirm it responds
+```
+
+- Empty output from `which` means the command is not on `PATH` for the current shell.
+- `readlink -f` should point at `<checkout>/dist/cli.js`. If it points somewhere else,
+  an older install is shadowing this checkout.
+- On Windows use `where webpify`; `readlink` does not exist there.
+
+> **Node version managers.** Under nvm, fnm, or Volta, every Node version has its own
+> global bin directory. `npm link` registers the command only for the version that was
+> active when you ran it, so `nvm use <other>` can make `webpify` disappear from `PATH`
+> even though nothing is broken. Re-run `npm link` under the version you want to use, or
+> point every version at one shared prefix with `npm config set prefix <dir>`.
+
+To remove a linked install:
+
+```bash
+npm unlink --global all-images-to-webp
+```
+
 ### Defaults
 
 Every flag has a default, so `webpify <location>` alone is a valid, complete run.
