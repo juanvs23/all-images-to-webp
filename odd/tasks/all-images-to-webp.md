@@ -116,7 +116,10 @@ that fails CI when any file fails.
 4. A corrupt image is reported as failed, other files still convert, exit code is `1`.
 5. `--dry-run` writes nothing and reports `planned`.
 6. `--remove-original` deletes a source only after its `.webp` exists and is non-zero.
-7. `--help` and unknown flags exit `2` with a usage message on stderr.
+7. Unknown flags and validation errors exit `2` with a usage message on stderr.
+   `--help` and `--version` print to stdout and exit `0` (corrected during T7: the draft of
+   this criterion demanded exit `2` for `--help`, which contradicts the standard convention
+   and the CLI surface actually specified. The implementation follows the convention.)
 8. Existing `.webp` targets are skipped unless `--overwrite`.
 9. `npm run typecheck` and `npm test` pass with no skipped tests.
 
@@ -124,18 +127,49 @@ that fails CI when any file fails.
 
 | Task | Status | Evidence |
 | --- | --- | --- |
-| T1 Scaffold | pending | — |
-| T2 Types + scanner | pending | — |
-| T3 Converter core | pending | — |
-| T4 CLI + reporter | pending | — |
-| T5 Tests green | pending | — |
-| T6 Docs | pending | — |
-| T7 Verify + commits | pending | — |
+| T1 Scaffold | done | `582d0b0`, `npm run typecheck` clean |
+| T2 Types + scanner | done | `96506e0`, `tests/scanner.test.ts` 5 green |
+| T3 Converter core | done | `5977143`, `tests/converter.test.ts` 12 green |
+| T4 CLI + reporter | done | `2848b47`, `tests/pool.test.ts` 4 green |
+| T5 Tests green | done | `ff3d8e3`, `tests/cli.e2e.test.ts` 12 green, 33 total |
+| T6 Docs | done | `1cd76fd`, README + AGENTS + docs |
+| T7 Verify + commits | done | parent verification below |
 
 ## Verification evidence
 
-_(filled during T7)_
+Verified by the orchestrator, not accepted from the writer's report:
+
+- `npm run typecheck` — exit 0, no diagnostics.
+- `npm test` — 4 files, **33 tests passed, 0 skipped**.
+- `git status --short` — clean; `tests/e2e/cli/evidence/` untracked and gitignored.
+
+Behavioural spot checks on generated fixtures
+(`tests/e2e/cli/evidence/verify-*`):
+
+| Check | Observed |
+| --- | --- |
+| `--json` stdout purity | stdout parsed as JSON; progress on stderr |
+| Corrupt input isolated | `failed:1`, `converted:2`, exit `1`, batch continued |
+| `.webp` input | `skipped:already-webp`, never re-encoded |
+| Existing target | `skipped:exists` |
+| Unknown flag | exit `2`, usage on stderr |
+| Missing `<location>` | exit `2` |
+| `--help` | exit `0`, usage on stdout |
+| `--dry-run` | zero `.webp` written, exit `0` |
+| `--out` mirroring | `<out>/rotated.webp`, `<out>/tiny.webp` |
+| EXIF orientation 6 on 400x200 | output `200x400` — orientation applied |
+| `--max-width 5000` on 120x80 | output `120x80` — no enlargement |
+| Metadata | EXIF stripped, ICC stripped by default |
+| Output format | `webp` confirmed via `sharp().metadata()` |
+| Real run totals | 2 images, 23 315 B → 4 562 B, **80.4 % saved** |
+
+## Contract deviation resolved
+
+The writer flagged that this document's draft criterion 7 demanded exit `2` for `--help`
+while the delegation brief specified exit `0`. The standard convention won and the
+criterion was corrected here; no code change was needed.
 
 ## Next step
 
-T1 scaffold, delegated to one bounded writer with this document as the contract.
+Feature complete at 0.1.0. Open items live in `docs/roadmap.md`; publishing to npm and
+creating a remote are user decisions, not part of this work.
