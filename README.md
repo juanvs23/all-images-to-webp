@@ -314,4 +314,4 @@ authoritative feature contract is `odd/tasks/all-images-to-webp.md`.
 
 ## License
 
-MIT
+[MIT](./LICENSE) © 2026 Juan Carlos Avila
