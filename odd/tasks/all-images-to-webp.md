@@ -171,5 +171,7 @@ criterion was corrected here; no code change was needed.
 
 ## Next step
 
-Feature complete at 0.1.0. Open items live in `docs/roadmap.md`; publishing to npm and
-creating a remote are user decisions, not part of this work.
+Feature complete and published at 0.1.0: source is public at
+<https://github.com/juanvs23/all-images-to-webp> under the MIT license. Open items live
+in `docs/roadmap.md`. Publishing to the npm registry is still pending and remains a user
+decision.

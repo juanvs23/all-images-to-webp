@@ -19,5 +19,6 @@ All notable changes to this project are documented here. The format follows
 - `--json` summary on stdout with a stable, documented shape; human progress on
   stderr in JSON mode.
 - Programmatic `convertAll()` API with an `onResult` callback.
+- MIT license, with `repository`, `bugs`, and `homepage` metadata in `package.json`.
 - Unit tests for scanner, converter, and pool; CLI e2e tests covering exit codes,
   JSON shape, dry runs, output mirroring, and source removal.

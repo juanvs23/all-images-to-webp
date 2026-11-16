@@ -302,15 +302,22 @@ without spawning a process.
 
 ## Development
 
+Source: <https://github.com/juanvs23/all-images-to-webp>
+
 ```bash
+git clone git@github.com:juanvs23/all-images-to-webp.git
+cd all-images-to-webp
 npm install
 npm run typecheck   # tsc --noEmit
 npm test            # build + vitest (unit and CLI e2e)
 npm run build       # tsc -> dist/
+npm link            # optional: expose `webpify` globally
 ```
 
 Architecture, vocabulary, and environment notes live in `docs/context.md`. The
-authoritative feature contract is `odd/tasks/all-images-to-webp.md`.
+authoritative feature contract is `odd/tasks/all-images-to-webp.md`. How the
+end-to-end suite generates fixtures and stores evidence is documented in
+`tests/e2e/cli/README.md`.
 
 ## License
 
